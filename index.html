@@ -1,0 +1,625 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>BancoLab API</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&family=Source+Serif+4:opsz,wght@8..60,500;8..60,600&display=swap">
+<style>
+/* Layout: una consola de API de un banco ficticio — misiones arriba, constructor de solicitud a la izquierda, solicitud y respuesta a la derecha, bitácora al pie. */
+:root {
+  --bg: #F4F2EC;
+  --surface: #FFFDF8;
+  --surface-2: #ECE8DF;
+  --line: #D9D3C7;
+  --fg: #14213D;
+  --muted: #4A5568;
+  --accent: #B54A17;
+  --accent-fill: #E0692B;
+  --accent-soft: #FBE7DB;
+  --code-bg: #14213D;
+  --code-fg: #E9E6DF;
+  --code-muted: #9AA6BA;
+  --code-key: #F2A07B;
+  --code-str: #A8D5B9;
+  --code-num: #F2CC7A;
+  --ok: #1F6E47;
+  --ok-soft: #DDF0E5;
+  --warn: #8A5200;
+  --warn-soft: #FBEBCF;
+  --err: #A52A1F;
+  --err-soft: #F9DEDA;
+  --font-display: 'Source Serif 4', Georgia, serif;
+  --font-body: 'IBM Plex Sans', 'Segoe UI', Arial, sans-serif;
+  --font-mono: 'IBM Plex Mono', 'Courier New', monospace;
+  --radius: 12px;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0E1524; --surface: #162036; --surface-2: #1D2944; --line: #2C3A58;
+    --fg: #ECE9E2; --muted: #A9B3C4; --accent: #F2A07B; --accent-fill: #E0692B; --accent-soft: #3A2A22;
+    --code-bg: #0A101C; --code-fg: #E9E6DF; --code-muted: #8794AA; --code-key: #F2A07B; --code-str: #A8D5B9; --code-num: #F2CC7A;
+    --ok: #6CCB98; --ok-soft: #173327; --warn: #F2B45A; --warn-soft: #3A2C14; --err: #FF8F84; --err-soft: #3D1C1A;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0E1524; --surface: #162036; --surface-2: #1D2944; --line: #2C3A58;
+  --fg: #ECE9E2; --muted: #A9B3C4; --accent: #F2A07B; --accent-fill: #E0692B; --accent-soft: #3A2A22;
+  --code-bg: #0A101C; --code-fg: #E9E6DF; --code-muted: #8794AA; --code-key: #F2A07B; --code-str: #A8D5B9; --code-num: #F2CC7A;
+  --ok: #6CCB98; --ok-soft: #173327; --warn: #F2B45A; --warn-soft: #3A2C14; --err: #FF8F84; --err-soft: #3D1C1A;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body { margin: 0; }
+[hidden] { display: none !important; }
+body { background: var(--bg); color: var(--fg); font-family: var(--font-body); font-size: 15px; line-height: 1.5; }
+h1, h2, h3 { font-family: var(--font-display); font-weight: 600; text-wrap: balance; margin: 0; }
+p { margin: 0; }
+button, input { font: inherit; color: inherit; }
+button { cursor: pointer; }
+:focus-visible { outline: 2px solid var(--accent-fill); outline-offset: 2px; }
+.mono { font-family: var(--font-mono); }
+.eyebrow { font-size: 12px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--accent); }
+
+.top { background: var(--surface); border-bottom: 1px solid var(--line); }
+.top-in, .wrap, .foot {
+  max-width: 1240px; margin: 0 auto;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+.top-in { padding-block: 16px; display: flex; flex-wrap: wrap; gap: 12px 24px; align-items: center; justify-content: space-between; }
+.brand { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.brand h1 { font-size: 26px; line-height: 1.1; }
+.brand h1 span { color: var(--accent); }
+.brand p { color: var(--muted); font-size: 14px; }
+.top-actions { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+.tag { font-size: 12px; font-weight: 600; padding: 6px 10px; border-radius: 999px; background: var(--surface-2); color: var(--muted); }
+.sigma { display: inline-flex; align-items: center; gap: 8px; border: 1px solid var(--line); background: var(--surface); border-radius: 999px; padding: 6px 14px 6px 10px; font-size: 13px; font-weight: 600; }
+.sigma .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--ok); }
+.sigma[aria-pressed="true"] { background: var(--err-soft); border-color: var(--err); color: var(--err); }
+.sigma[aria-pressed="true"] .dot { background: var(--err); }
+.ghost { border: 1px solid var(--line); background: transparent; border-radius: 999px; padding: 6px 14px; font-size: 13px; color: var(--muted); }
+.ghost:hover { color: var(--fg); border-color: var(--muted); }
+
+.wrap { padding-block: 24px 32px; display: flex; flex-direction: column; gap: 20px; }
+
+.missions { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 20px; display: flex; flex-direction: column; gap: 16px; }
+.steps { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 2px; }
+.step { flex: 1 0 150px; text-align: left; border: 1px solid var(--line); background: var(--bg); border-radius: 10px; padding: 10px 12px; display: flex; flex-direction: column; gap: 2px; }
+.step .n { font-size: 12px; font-weight: 600; color: var(--muted); letter-spacing: .04em; }
+.step .t { font-size: 14px; font-weight: 600; line-height: 1.25; }
+.step .s { font-size: 12px; color: var(--muted); }
+.step[aria-current="step"] { border-color: var(--accent-fill); background: var(--accent-soft); }
+.step.done .s { color: var(--ok); font-weight: 600; }
+.mission { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 20px; }
+.mission-main { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.mission-main h2 { font-size: 24px; line-height: 1.2; }
+.bubble { align-self: flex-start; max-width: 100%; background: var(--surface-2); border-radius: 14px 14px 14px 4px; padding: 10px 14px; font-size: 15px; }
+.bubble b { display: block; font-size: 12px; color: var(--muted); font-weight: 600; letter-spacing: .04em; text-transform: uppercase; }
+.goal { font-size: 15px; }
+details.hint summary { cursor: pointer; color: var(--accent); font-weight: 600; font-size: 14px; }
+details.hint p { margin-top: 6px; color: var(--muted); font-size: 14px; }
+.mission-side { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.pending { border: 1px dashed var(--line); border-radius: 10px; padding: 14px; color: var(--muted); font-size: 14px; }
+.success { border: 1px solid var(--ok); background: var(--ok-soft); border-radius: 10px; padding: 14px 16px; display: flex; flex-direction: column; gap: 8px; }
+.success .lbl { font-size: 12px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--ok); }
+.success p { font-size: 14px; }
+.discuss { font-size: 14px; border-top: 1px solid var(--line); padding-top: 8px; }
+.discuss b { color: var(--accent); }
+.next { align-self: flex-start; border: none; background: var(--fg); color: var(--bg); border-radius: 999px; padding: 8px 16px; font-size: 14px; font-weight: 600; }
+.quiz, .fields { display: flex; flex-direction: column; gap: 8px; }
+.quiz p.q, .fields p.q { font-weight: 600; font-size: 14px; }
+.opt { text-align: left; border: 1px solid var(--line); background: var(--surface); border-radius: 10px; padding: 10px 12px; font-size: 14px; }
+.opt:hover { border-color: var(--muted); }
+.opt.right { border-color: var(--ok); background: var(--ok-soft); }
+.opt.wrong { border-color: var(--err); background: var(--err-soft); }
+.fb { font-size: 13px; color: var(--muted); }
+.field-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
+.field { display: flex; gap: 8px; align-items: center; border: 1px solid var(--line); border-radius: 8px; padding: 6px 10px; font-family: var(--font-mono); font-size: 13px; background: var(--surface); min-width: 0; }
+.field span.n { overflow-wrap: anywhere; }
+.field .res { margin-left: auto; font-family: var(--font-body); font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; }
+.field.good { border-color: var(--ok); }
+.field.good .res { color: var(--ok); }
+.field.bad { border-color: var(--err); }
+.field.bad .res { color: var(--err); }
+.small-btn { align-self: flex-start; border: 1px solid var(--fg); background: transparent; border-radius: 999px; padding: 6px 14px; font-size: 13px; font-weight: 600; }
+
+.grid { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); gap: 20px; align-items: start; }
+.out { position: sticky; top: calc(16px + env(safe-area-inset-top, 0px)); }
+.panel { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 20px; display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+.panel h2 { font-size: 20px; display: flex; gap: 10px; align-items: baseline; }
+.panel h2 .num { font-family: var(--font-mono); font-size: 13px; color: var(--accent); font-weight: 500; }
+fieldset { border: 0; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+legend { font-size: 13px; font-weight: 600; color: var(--muted); margin-bottom: 8px; padding: 0; }
+.choice { position: relative; display: flex; gap: 10px; align-items: flex-start; border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; cursor: pointer; background: var(--bg); }
+.choice input { position: absolute; opacity: 0; pointer-events: none; }
+.choice:has(input:checked) { border-color: var(--accent-fill); background: var(--accent-soft); }
+.choice:has(input:focus-visible) { outline: 2px solid var(--accent-fill); outline-offset: 2px; }
+.choice .txt { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.choice .path { font-family: var(--font-mono); font-size: 13px; overflow-wrap: anywhere; }
+.choice .desc { font-size: 14px; font-weight: 600; }
+.choice .sub { font-size: 13px; color: var(--muted); }
+.verb { flex: none; font-family: var(--font-mono); font-size: 11px; font-weight: 500; padding: 2px 6px; border-radius: 4px; margin-top: 2px; color: var(--surface); background: var(--fg); }
+.verb.post { background: var(--accent-fill); color: #14213D; }
+.idrow { display: flex; flex-direction: column; gap: 8px; }
+.idrow label { font-size: 13px; font-weight: 600; color: var(--muted); }
+.idrow input { font-family: var(--font-mono); font-size: 15px; border: 1px solid var(--line); background: var(--bg); border-radius: 8px; padding: 10px 12px; width: 100%; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; font-size: 13px; color: var(--muted); }
+.chip { border: 1px solid var(--line); background: var(--surface); border-radius: 999px; padding: 3px 10px; font-family: var(--font-mono); font-size: 12px; }
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 999px; padding: 3px; background: var(--bg); align-self: flex-start; }
+.seg button { border: none; background: transparent; border-radius: 999px; padding: 6px 14px; font-size: 13px; font-weight: 600; color: var(--muted); }
+.seg button[aria-pressed="true"] { background: var(--fg); color: var(--bg); }
+.send { border: none; background: var(--accent-fill); color: #14213D; font-weight: 600; font-size: 16px; border-radius: 10px; padding: 12px 18px; display: flex; justify-content: center; gap: 8px; }
+.send:disabled { opacity: .6; cursor: progress; }
+
+.codeblock { background: var(--code-bg); color: var(--code-fg); border-radius: 10px; padding: 16px; font-family: var(--font-mono); font-size: 13.5px; line-height: 1.6; white-space: pre-wrap; overflow-wrap: anywhere; margin: 0; overflow-x: auto; }
+.codeblock .c-m { color: var(--code-key); font-weight: 500; }
+.codeblock .c-h { color: var(--code-muted); }
+.codeblock .c-cm { color: var(--code-muted); font-style: italic; }
+.j-k { color: var(--code-key); }
+.j-s { color: var(--code-str); }
+.j-n { color: var(--code-num); }
+.j-b, .j-z { color: var(--code-num); }
+.empty { color: var(--code-muted); font-style: italic; }
+.status { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; }
+.badge { font-family: var(--font-mono); font-weight: 500; font-size: 14px; padding: 4px 10px; border-radius: 6px; }
+.badge.ok { background: var(--ok-soft); color: var(--ok); }
+.badge.warn { background: var(--warn-soft); color: var(--warn); }
+.badge.err { background: var(--err-soft); color: var(--err); }
+.badge.idle { background: var(--surface-2); color: var(--muted); }
+.latency { font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.meaning { font-size: 15px; }
+.meaning b { font-weight: 600; }
+.sub-h { font-size: 13px; font-weight: 600; color: var(--muted); }
+
+.log table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.log th { text-align: left; font-weight: 600; color: var(--muted); border-bottom: 1px solid var(--line); padding: 6px 8px; white-space: nowrap; }
+.log td { border-bottom: 1px solid var(--line); padding: 8px; vertical-align: top; font-variant-numeric: tabular-nums; }
+.log td.mono { font-size: 12.5px; overflow-wrap: anywhere; }
+.tablewrap { overflow-x: auto; }
+.log-note { font-size: 13px; color: var(--muted); }
+
+.foot { padding-block: 8px 32px; color: var(--muted); font-size: 13px; }
+
+@media (max-width: 900px) {
+  .grid, .mission { grid-template-columns: minmax(0, 1fr); }
+  .out { position: static; }
+}
+@media (max-width: 520px) {
+  .field-grid { grid-template-columns: minmax(0, 1fr); }
+  .brand h1 { font-size: 22px; }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .response-anim { animation: rise .25s ease-out; }
+  @keyframes rise { from { opacity: .3; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+}
+</style>
+</head>
+<body>
+<header class="top">
+  <div class="top-in">
+    <div class="brand">
+      <h1>Banco<span>Lab</span> · API de atención a clientes</h1>
+      <p>Simulador didáctico · Diplomado Fintech CIDE</p>
+    </div>
+    <div class="top-actions">
+      <span class="tag">Banco ficticio · datos inventados</span>
+      <button type="button" class="sigma" id="sigmaBtn" aria-pressed="false"><span class="dot" aria-hidden="true"></span><span id="sigmaTxt">COR Bancario: en línea</span></button>
+      <button type="button" class="ghost" id="resetBtn">Reiniciar todo</button>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+  <section class="missions" aria-labelledby="missionsLbl">
+    <p class="eyebrow" id="missionsLbl">Misiones</p>
+    <div class="steps" id="steps" role="list"></div>
+    <div class="mission" id="mission"></div>
+  </section>
+
+  <div class="grid">
+    <section class="panel" aria-labelledby="h-build">
+      <h2 id="h-build"><span class="num">01</span>Arma la solicitud</h2>
+      <fieldset id="epSet">
+        <legend>¿Qué quieres pedirle a la API? (punto de acceso)</legend>
+      </fieldset>
+      <div class="idrow">
+        <label for="idInput" id="idLabel">Identificador</label>
+        <input id="idInput" type="text" autocomplete="off" spellcheck="false">
+        <div class="chips" id="chips"></div>
+      </div>
+      <fieldset id="tokSet">
+        <legend>¿Con qué credencial? (autenticación)</legend>
+      </fieldset>
+      <div class="idrow">
+        <span class="sub-h" id="viewLbl">Ver la solicitud como</span>
+        <div class="seg" role="group" aria-labelledby="viewLbl">
+          <button type="button" id="viewApi" aria-pressed="true">API directa</button>
+          <button type="button" id="viewSdk" aria-pressed="false">SDK</button>
+        </div>
+      </div>
+      <button type="button" class="send" id="sendBtn">Enviar solicitud</button>
+    </section>
+
+    <div class="panel out" style="gap:20px">
+      <section style="display:flex;flex-direction:column;gap:10px;min-width:0" aria-labelledby="h-req">
+        <h2 id="h-req"><span class="num">02</span>Lo que se envía</h2>
+        <pre class="codeblock" id="reqView"></pre>
+      </section>
+      <section style="display:flex;flex-direction:column;gap:10px;min-width:0" aria-labelledby="h-res" aria-live="polite">
+        <h2 id="h-res"><span class="num">03</span>Lo que responde la API</h2>
+        <div class="status"><span class="badge idle" id="badge">Sin enviar</span><span class="latency" id="latency"></span></div>
+        <p class="meaning" id="meaning">Arma la solicitud y pulsa “Enviar solicitud”.</p>
+        <pre class="codeblock" id="resView"><span class="empty">La respuesta aparecerá aquí, en formato JSON.</span></pre>
+      </section>
+    </div>
+  </div>
+
+  <section class="panel log" aria-labelledby="h-log">
+    <h2 id="h-log"><span class="num">04</span>Bitácora de llamadas</h2>
+    <p class="log-note">Cada solicitud queda registrada: quién la hizo, qué pidió y qué obtuvo. Es lo que revisaría una auditoría.</p>
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th>Hora</th><th>Credencial</th><th>Solicitud</th><th>Resultado</th></tr></thead>
+        <tbody id="logBody"><tr><td colspan="4" class="log-note">Todavía no hay llamadas.</td></tr></tbody>
+      </table>
+    </div>
+  </section>
+</main>
+<footer class="foot">BancoLab es un banco ficticio creado para esta sesión. Ninguna persona, cuenta o tarjeta es real y ninguna solicitud sale de esta página.</footer>
+
+<script>
+(function () {
+  var HOST = 'api.bancolab.example';
+  var EP = {
+    saldo: { method: 'GET', path: '/v1/cuentas/{numero_cuenta}/saldo', param: 'numero_cuenta', label: 'Número de cuenta', desc: 'Consultar saldo', sub: 'Saldo disponible de una cuenta', examples: ['4821', '7730'], def: '4821', write: false,
+      sdk: function (id) { return 'banco.cuentas.saldo("' + id + '")'; } },
+    transferencia: { method: 'GET', path: '/v1/transferencias/{folio}', param: 'folio', label: 'Folio de la transferencia', desc: 'Estatus de una transferencia', sub: 'Dónde está una transferencia SPEI', examples: ['SPEI-58210', 'SPEI-58211'], def: 'SPEI-58210', write: false,
+      sdk: function (id) { return 'banco.transferencias.estatus("' + id + '")'; } },
+    cliente: { method: 'GET', path: '/v1/clientes/{id_cliente}', param: 'id_cliente', label: 'Identificador del cliente', desc: 'Consultar datos del cliente', sub: 'Expediente del cliente', examples: ['C-1024', 'C-2048'], def: 'C-1024', write: false,
+      sdk: function (id) { return 'banco.clientes.obtener("' + id + '")'; } },
+    bloqueo: { method: 'POST', path: '/v1/tarjetas/{id_tarjeta}/bloqueo', param: 'id_tarjeta', label: 'Identificador de la tarjeta', desc: 'Bloquear tarjeta', sub: 'Operación: modifica la cuenta del cliente', examples: ['T-4821', 'T-7730'], def: 'T-4821', write: true, body: { motivo: 'robo o extravío' },
+      sdk: function (id) { return 'banco.tarjetas.bloquear("' + id + '", motivo="robo o extravío")'; } }
+  };
+  var EP_ORDER = ['saldo', 'transferencia', 'cliente', 'bloqueo'];
+  var TOK = {
+    none: { label: 'Sin credencial', short: 'Sin credencial', sub: 'La solicitud no dice quién la hace', header: null, sdk: null, scopes: [] },
+    lectura: { label: 'Token del chatbot', short: 'Chatbot (lectura)', sub: 'Permiso de solo lectura', header: 'Bearer chatbot_lect_••••••', sdk: 'chatbot_lect_••••••', scopes: ['read'] },
+    ops: { label: 'Token de agente autorizado', short: 'Agente (operaciones)', sub: 'Permiso de lectura y operaciones', header: 'Bearer agente_ops_••••••', sdk: 'agente_ops_••••••', scopes: ['read', 'write'] }
+  };
+  var STATUS = {
+    200: { t: '200 OK', k: 'ok', m: '<b>Solicitud exitosa.</b> La API devolvió la información solicitada.' },
+    400: { t: '400 Bad Request', k: 'warn', m: '<b>Solicitud incompleta.</b> Falta un dato obligatorio o tiene un formato incorrecto.' },
+    401: { t: '401 Unauthorized', k: 'warn', m: '<b>Sin credencial.</b> La API no sabe quién hace la solicitud, así que no responde.' },
+    403: { t: '403 Forbidden', k: 'warn', m: '<b>Sin permiso.</b> La API sabe quién eres, pero esa credencial no puede hacer esta operación.' },
+    404: { t: '404 Not Found', k: 'warn', m: '<b>No existe.</b> No hay ningún registro con ese identificador. Revisa el dato.' },
+    409: { t: '409 Conflict', k: 'warn', m: '<b>Conflicto.</b> La operación choca con el estado actual: ya se había realizado.' },
+    503: { t: '503 Service Unavailable', k: 'err', m: '<b>Sistema no disponible.</b> El sistema que tiene la información (COR Bancario) no respondió.' }
+  };
+
+  function freshData() {
+    return {
+      cuentas: {
+        '4821': { cuenta: '4821', titular: 'Mariana Torres Ruiz', saldo_disponible: 1250.75, saldo_retenido: 300.00, moneda: 'MXN', actualizado: '2026-10-21T09:41:00-06:00' },
+        '7730': { cuenta: '7730', titular: 'Jorge Medina Paz', saldo_disponible: 18420.10, saldo_retenido: 0, moneda: 'MXN', actualizado: '2026-10-21T09:38:00-06:00' }
+      },
+      transferencias: {
+        'SPEI-58210': { folio: 'SPEI-58210', clave_rastreo: 'BLAB2026102100058210', monto: 2500.00, moneda: 'MXN', banco_destino: 'Banco Ejemplo', estatus: 'en proceso', enviada: '2026-10-21T08:57:00-06:00', detalle: 'En espera de confirmación del banco receptor.' },
+        'SPEI-58211': { folio: 'SPEI-58211', clave_rastreo: 'BLAB2026102100058211', monto: 640.00, moneda: 'MXN', banco_destino: 'Banco Muestra', estatus: 'liquidada', enviada: '2026-10-21T08:12:00-06:00', detalle: 'El banco receptor confirmó el abono.' }
+      },
+      clientes: {
+        'C-1024': { id_cliente: 'C-1024', nombre: 'Mariana Torres Ruiz', estatus: 'activo', curp: 'TORM900215MDFRRS09', fecha_nacimiento: '1990-02-15', domicilio: 'Calle Ficticia 123, Col. Centro, Ciudad de México', telefono: '55 5555 0101', correo: 'mariana.torres@ejemplo.com', ingreso_mensual: 32000 },
+        'C-2048': { id_cliente: 'C-2048', nombre: 'Jorge Medina Paz', estatus: 'activo', curp: 'MEPJ850730HJCDZR04', fecha_nacimiento: '1985-07-30', domicilio: 'Av. Inventada 45, Guadalajara, Jalisco', telefono: '33 5555 0202', correo: 'jorge.medina@ejemplo.com', ingreso_mensual: 54000 }
+      },
+      tarjetas: {
+        'T-4821': { id_tarjeta: 'T-4821', terminacion: '•••• 4821', estatus: 'activa' },
+        'T-7730': { id_tarjeta: 'T-7730', terminacion: '•••• 7730', estatus: 'activa' }
+      }
+    };
+  }
+
+  var FIELDS = [
+    { k: 'nombre', need: true }, { k: 'estatus', need: true },
+    { k: 'curp', need: false }, { k: 'fecha_nacimiento', need: false },
+    { k: 'domicilio', need: false }, { k: 'telefono', need: false },
+    { k: 'correo', need: false }, { k: 'ingreso_mensual', need: false }
+  ];
+
+  var MISSIONS = [
+    { titulo: 'Consulta un saldo', cliente: '¿Cuánto dinero tengo disponible en mi cuenta 4821?',
+      objetivo: 'Obtén el saldo disponible de la cuenta 4821 usando la credencial del chatbot.',
+      pista: 'Elige “Consultar saldo”, revisa que el número de cuenta sea 4821, selecciona el token del chatbot y envía. Después prueba sin credencial o con una cuenta que no existe (por ejemplo, 9999) y compara las respuestas.',
+      aprendizaje: 'Toda llamada tiene tres piezas: el punto de acceso (qué se pide), la credencial (quién lo pide) y la respuesta (lo que se recibe, en formato JSON). Sin credencial, la API responde 401; con un dato inexistente, 404.',
+      discutir: '¿Qué campo de la respuesta usaría el chatbot para contestarle al cliente?' },
+    { titulo: 'Bloquea una tarjeta', cliente: '¡Me robaron la cartera! Por favor bloqueen mi tarjeta T-4821.',
+      objetivo: 'Intenta bloquear la tarjeta T-4821 con la credencial del chatbot. Después, inténtalo con la de un agente autorizado.',
+      pista: 'Elige “Bloquear tarjeta”. Primero usa el token del chatbot (solo lectura) y observa el código. Luego cambia al token de agente autorizado. Si lo intentas una tercera vez, verás un código nuevo.',
+      aprendizaje: 'Consultar y ejecutar no implican el mismo riesgo. Con permisos mínimos, el chatbot puede leer pero no operar: la API responde 403. Ejecutar una acción exige una credencial con más permisos y, por lo tanto, más controles.',
+      discutir: '¿Debería el chatbot tener permiso para bloquear tarjetas? ¿Qué controles pondrían antes de otorgárselo?' },
+    { titulo: 'El COR Bancario no responde', cliente: 'Hice una transferencia con folio SPEI-58210 y no aparece. ¿Qué pasó?',
+      objetivo: 'Consulta el estatus de la transferencia SPEI-58210. Después activa “COR Bancario” arriba a la derecha para simular una falla y repite la consulta.',
+      pista: 'Elige “Estatus de una transferencia” con el token del chatbot. Con el COR Bancario en línea verás el estatus; sin servicio, la API responderá 503.',
+      aprendizaje: 'Toda integración puede fallar. El diseño debe definir qué hace el chatbot cuando un sistema no responde: avisar con claridad, no inventar información y escalar a una persona cuando corresponde.',
+      discutir: '¿Cuánto tiempo debería esperar el chatbot antes de escalar el caso?' },
+    { titulo: '¿Sobra algún dato?', cliente: 'Hola, soy el cliente C-1024.',
+      objetivo: 'Consulta los datos del cliente C-1024. Para saludarlo y saber si puede atenderlo, el chatbot solo necesita su nombre y el estatus. Marca los campos que sobran.',
+      pista: 'Elige “Consultar datos del cliente” con el token del chatbot. Revisa la respuesta completa antes de marcar.',
+      aprendizaje: 'El diseño de la API decide qué datos se exponen. Si la respuesta incluye más de lo necesario, cada consulta del chatbot transporta datos personales que no utiliza. El principio es la minimización: devolver solo lo indispensable.',
+      discutir: '¿Quién debería decidir qué campos devuelve esta API: el equipo técnico, el de cumplimiento o ambos?' },
+    { titulo: 'API directa o SDK', cliente: null,
+      objetivo: 'Cambia “Ver la solicitud como” a SDK y repite la consulta del saldo de la cuenta 4821. Compara la solicitud y la respuesta con las de la misión 1.',
+      pista: 'El selector está justo encima del botón “Enviar solicitud”.',
+      aprendizaje: 'La respuesta es idéntica: el SDK hace por dentro la misma llamada a la API. Lo que cambia es el trabajo del equipo técnico: el SDK arma la solicitud, agrega la credencial y maneja errores y reintentos.',
+      discutir: 'Si el proveedor publica una nueva versión de su SDK, ¿quién debe revisarla antes de usarla?' }
+  ];
+
+  var state;
+  function initState() {
+    state = {
+      ep: 'saldo', tok: 'lectura', view: 'api', sigmaDown: false,
+      data: freshData(), log: [], active: 0,
+      done: [false, false, false, false, false],
+      flags: { saw403: false, m3ok: false, m3down: false, quizPick: null, m4called: false, m4marks: {}, m4reviewed: false }
+    };
+  }
+  initState();
+  try {
+    var saved = JSON.parse(localStorage.getItem('bancolab-progreso') || 'null');
+    if (saved && Array.isArray(saved.done)) { state.done = saved.done.slice(0, 5); state.active = saved.active || 0; }
+  } catch (e) {}
+  function save() { try { localStorage.setItem('bancolab-progreso', JSON.stringify({ done: state.done, active: state.active })); } catch (e) {} }
+
+  var $ = function (id) { return document.getElementById(id); };
+  function esc(s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+  function hl(obj) {
+    var s = esc(JSON.stringify(obj, null, 2));
+    return s.replace(/"(?:\\.|[^"\\])*"(\s*:)?|\b(true|false|null)\b|-?\d+(?:\.\d+)?/g, function (m) {
+      var c = 'n';
+      if (m.charAt(0) === '"') c = /:\s*$/.test(m) ? 'k' : 's';
+      else if (/^(true|false|null)$/.test(m)) c = 'b';
+      return '<span class="j-' + c + '">' + m + '</span>';
+    });
+  }
+
+  /* --- Builder --- */
+  function buildChoices() {
+    var epSet = $('epSet');
+    EP_ORDER.forEach(function (k) {
+      var e = EP[k];
+      var lab = document.createElement('label');
+      lab.className = 'choice';
+      lab.innerHTML = '<input type="radio" name="ep" id="ep-' + k + '" value="' + k + '"><span class="verb' + (e.method === 'POST' ? ' post' : '') + '">' + e.method + '</span>' +
+        '<span class="txt"><span class="desc">' + e.desc + '</span><span class="path">' + e.path + '</span><span class="sub">' + e.sub + '</span></span>';
+      epSet.appendChild(lab);
+    });
+    var tokSet = $('tokSet');
+    ['none', 'lectura', 'ops'].forEach(function (k) {
+      var t = TOK[k];
+      var lab = document.createElement('label');
+      lab.className = 'choice';
+      lab.innerHTML = '<input type="radio" name="tok" id="tok-' + k + '" value="' + k + '"><span class="txt"><span class="desc">' + t.label + '</span><span class="sub">' + t.sub + '</span></span>';
+      tokSet.appendChild(lab);
+    });
+    epSet.addEventListener('change', function (ev) { if (ev.target.name === 'ep') { state.ep = ev.target.value; $('idInput').value = EP[state.ep].def; syncBuilder(); } });
+    tokSet.addEventListener('change', function (ev) { if (ev.target.name === 'tok') { state.tok = ev.target.value; renderReq(); } });
+    $('idInput').addEventListener('input', renderReq);
+    $('viewApi').addEventListener('click', function () { state.view = 'api'; syncBuilder(); });
+    $('viewSdk').addEventListener('click', function () { state.view = 'sdk'; syncBuilder(); });
+  }
+  function syncBuilder() {
+    var e = EP[state.ep];
+    $('ep-' + state.ep).checked = true;
+    $('tok-' + state.tok).checked = true;
+    $('idLabel').textContent = e.label + ' (' + e.param + ')';
+    var chips = $('chips');
+    chips.innerHTML = '<span>Ejemplos:</span>';
+    e.examples.forEach(function (x) {
+      var b = document.createElement('button');
+      b.type = 'button'; b.className = 'chip'; b.textContent = x;
+      b.addEventListener('click', function () { $('idInput').value = x; renderReq(); });
+      chips.appendChild(b);
+    });
+    $('viewApi').setAttribute('aria-pressed', state.view === 'api');
+    $('viewSdk').setAttribute('aria-pressed', state.view === 'sdk');
+    renderReq();
+  }
+  function currentId() { return $('idInput').value.trim().toUpperCase(); }
+  function renderReq() {
+    var e = EP[state.ep], t = TOK[state.tok], id = currentId();
+    var shown = id || '{' + e.param + '}';
+    var html;
+    if (state.view === 'api') {
+      html = '<span class="c-m">' + e.method + '</span> ' + esc(e.path.replace('{' + e.param + '}', shown)) + ' HTTP/1.1\n' +
+        '<span class="c-h">Host:</span> ' + HOST + '\n' +
+        (t.header ? '<span class="c-h">Authorization:</span> ' + esc(t.header) + '\n' : '<span class="c-cm"># (sin encabezado de autorización)</span>\n');
+      if (e.body) html += '<span class="c-h">Content-Type:</span> application/json\n\n' + hl(e.body);
+    } else {
+      html = '<span class="c-cm"># El SDK arma la solicitud, agrega la credencial\n# y maneja errores y reintentos.</span>\n' +
+        '<span class="c-m">from</span> bancolab <span class="c-m">import</span> Banco\n\n' +
+        'banco = Banco(' + (t.sdk ? 'token=<span class="j-s">"' + esc(t.sdk) + '"</span>' : '') + ')\n' +
+        esc(e.sdk(shown));
+    }
+    $('reqView').innerHTML = html;
+  }
+
+  /* --- Simulated API --- */
+  function respond(epKey, id, tokKey) {
+    var e = EP[epKey], t = TOK[tokKey], d = state.data;
+    if (!id) return { s: 400, b: { error: 'solicitud_invalida', mensaje: 'Falta el parámetro ' + e.param + '.' } };
+    if (!t.header) return { s: 401, b: { error: 'no_autenticado', mensaje: 'La solicitud no incluye una credencial válida.' } };
+    if (e.write && t.scopes.indexOf('write') < 0) return { s: 403, b: { error: 'permiso_insuficiente', mensaje: 'La credencial no tiene permiso para ejecutar esta operación.', permiso_requerido: 'tarjetas:bloquear', permisos_de_la_credencial: ['consultas:lectura'] } };
+    if (state.sigmaDown) return { s: 503, b: { error: 'servicio_no_disponible', mensaje: 'El sistema de origen (COR Bancario) no respondió a tiempo.', reintentar_en_segundos: 60 } };
+    if (epKey === 'saldo') { var c = d.cuentas[id]; return c ? { s: 200, b: c } : { s: 404, b: { error: 'no_encontrado', mensaje: 'No existe una cuenta con el número ' + id + '.' } }; }
+    if (epKey === 'transferencia') { var tr = d.transferencias[id]; return tr ? { s: 200, b: tr } : { s: 404, b: { error: 'no_encontrado', mensaje: 'No existe una transferencia con el folio ' + id + '.' } }; }
+    if (epKey === 'cliente') { var cl = d.clientes[id]; return cl ? { s: 200, b: cl } : { s: 404, b: { error: 'no_encontrado', mensaje: 'No existe un cliente con el identificador ' + id + '.' } }; }
+    if (epKey === 'bloqueo') {
+      var tj = d.tarjetas[id];
+      if (!tj) return { s: 404, b: { error: 'no_encontrado', mensaje: 'No existe una tarjeta con el identificador ' + id + '.' } };
+      if (tj.estatus === 'bloqueada') return { s: 409, b: { error: 'conflicto', mensaje: 'La tarjeta ya se encuentra bloqueada.', folio_bloqueo: tj.folio_bloqueo } };
+      tj.estatus = 'bloqueada';
+      tj.folio_bloqueo = 'BLQ-2026-' + String(40 + Math.floor(Math.random() * 50)).padStart(4, '0');
+      return { s: 200, b: { id_tarjeta: tj.id_tarjeta, terminacion: tj.terminacion, estatus: 'bloqueada', motivo: 'robo o extravío', folio_bloqueo: tj.folio_bloqueo, bloqueada_en: new Date().toISOString().slice(0, 19) } };
+    }
+  }
+
+  function send() {
+    var btn = $('sendBtn');
+    btn.disabled = true; btn.textContent = 'Enviando…';
+    var epKey = state.ep, tokKey = state.tok, id = currentId(), view = state.view;
+    var wait = state.sigmaDown ? 1100 : 350 + Math.random() * 250;
+    setTimeout(function () {
+      var r = respond(epKey, id, tokKey);
+      var info = STATUS[r.s];
+      var badge = $('badge');
+      badge.className = 'badge ' + info.k; badge.textContent = info.t;
+      var ms = state.sigmaDown && r.s === 503 ? '3,000 ms (tiempo de espera agotado)' : Math.round(80 + Math.random() * 160) + ' ms';
+      $('latency').textContent = 'Tiempo de respuesta: ' + ms;
+      $('meaning').innerHTML = info.m;
+      var rv = $('resView');
+      rv.innerHTML = hl(r.b);
+      rv.classList.remove('response-anim'); void rv.offsetWidth; rv.classList.add('response-anim');
+      var now = new Date();
+      state.log.unshift({ h: now.toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit', second: '2-digit' }), tok: TOK[tokKey].short, req: EP[epKey].method + ' ' + EP[epKey].path.replace('{' + EP[epKey].param + '}', id || '—'), s: info.t, k: info.k });
+      state.log = state.log.slice(0, 12);
+      renderLog();
+      checkMissions({ ep: epKey, id: id, s: r.s, view: view });
+      btn.disabled = false; btn.textContent = 'Enviar solicitud';
+    }, wait);
+  }
+
+  function renderLog() {
+    var tb = $('logBody');
+    if (!state.log.length) { tb.innerHTML = '<tr><td colspan="4" class="log-note">Todavía no hay llamadas.</td></tr>'; return; }
+    tb.innerHTML = state.log.map(function (l) {
+      return '<tr><td>' + l.h + '</td><td>' + esc(l.tok) + '</td><td class="mono">' + esc(l.req) + '</td><td><span class="badge ' + l.k + '" style="font-size:12px;padding:2px 8px">' + l.s + '</span></td></tr>';
+    }).join('');
+  }
+
+  /* --- Missions --- */
+  function complete(i) {
+    if (!state.done[i]) { state.done[i] = true; save(); }
+  }
+  function checkMissions(c) {
+    if (c.ep === 'saldo' && c.s === 200) complete(0);
+    if (c.ep === 'bloqueo' && c.s === 403) state.flags.saw403 = true;
+    if (c.ep === 'bloqueo' && c.s === 200) complete(1);
+    if (c.ep === 'transferencia' && c.s === 200) state.flags.m3ok = true;
+    if (c.ep === 'transferencia' && c.s === 503) state.flags.m3down = true;
+    if (c.ep === 'cliente' && c.s === 200 && c.id === 'C-1024') state.flags.m4called = true;
+    if (c.ep === 'saldo' && c.s === 200 && c.view === 'sdk') complete(4);
+    renderSteps(); renderMission();
+  }
+
+  function renderSteps() {
+    var box = $('steps');
+    box.innerHTML = '';
+    MISSIONS.forEach(function (m, i) {
+      var b = document.createElement('button');
+      b.type = 'button'; b.className = 'step' + (state.done[i] ? ' done' : '');
+      b.setAttribute('role', 'listitem');
+      if (i === state.active) b.setAttribute('aria-current', 'step');
+      b.innerHTML = '<span class="n">Misión ' + (i + 1) + '</span><span class="t">' + m.titulo + '</span><span class="s">' + (state.done[i] ? '✓ Cumplida' : 'Pendiente') + '</span>';
+      b.addEventListener('click', function () { state.active = i; save(); renderSteps(); renderMission(); });
+      box.appendChild(b);
+    });
+  }
+
+  function successBlock(i) {
+    var m = MISSIONS[i];
+    var nextBtn = i < MISSIONS.length - 1 ? '<button type="button" class="next" id="nextBtn">Siguiente misión →</button>' : '<p class="fb">Completaron todas las misiones. Preparen sus respuestas para la discusión.</p>';
+    return '<div class="success"><span class="lbl">✓ Misión cumplida</span><p>' + m.aprendizaje + '</p><p class="discuss"><b>Para discutir:</b> ' + m.discutir + '</p></div>' + nextBtn;
+  }
+
+  function renderMission() {
+    var i = state.active, m = MISSIONS[i], f = state.flags;
+    var main = '<div class="mission-main"><h2>' + m.titulo + '</h2>' +
+      (m.cliente ? '<p class="bubble"><b>Cliente en el chat</b>' + m.cliente + '</p>' : '') +
+      '<p class="goal"><strong>Objetivo:</strong> ' + m.objetivo + '</p>' +
+      '<details class="hint"><summary>Ver una pista</summary><p>' + m.pista + '</p></details></div>';
+    var side = '';
+    if (i === 2) {
+      if (!f.m3down) {
+        side = '<p class="pending">' + (f.m3ok ? 'Ya viste el estatus. Ahora activa “COR Bancario” arriba a la derecha para simular la falla y vuelve a consultar.' : 'Aún no hay resultado. Envía la consulta y observa la respuesta.') + '</p>';
+      } else {
+        var opts = [
+          { t: '“Error 503: Service Unavailable.”', ok: false, fb: 'Un código técnico no le sirve al cliente y genera desconfianza.' },
+          { t: '“No encontramos tu transferencia.”', ok: false, fb: 'Es incorrecto: la transferencia existe, pero el sistema no respondió. Dar información falsa es el peor resultado posible.' },
+          { t: '“En este momento no puedo consultar tu transferencia. Te comunico con un asesor.”', ok: true, fb: 'Es transparente, no inventa información y escala el caso a una persona.' }
+        ];
+        side = '<div class="quiz"><p class="q">La API respondió 503. ¿Qué debería decirle el chatbot al cliente?</p>' +
+          opts.map(function (o, j) {
+            var cls = f.quizPick === j ? (o.ok ? ' right' : ' wrong') : '';
+            return '<button type="button" class="opt' + cls + '" data-q="' + j + '">' + o.t + (f.quizPick === j ? '<br><span class="fb">' + (o.ok ? 'Correcto. ' : 'No del todo. ') + o.fb + '</span>' : '') + '</button>';
+          }).join('') + '</div>';
+        if (f.quizPick === 2) { complete(2); }
+        if (state.done[2]) side += successBlock(2);
+      }
+    } else if (i === 3) {
+      if (!f.m4called) {
+        side = '<p class="pending">Primero consulta los datos del cliente C-1024. Después aparecerá aquí la lista de campos para marcar.</p>';
+      } else {
+        side = '<div class="fields"><p class="q">Marca los campos que el chatbot no necesita:</p><div class="field-grid">' +
+          FIELDS.map(function (fl) {
+            var marked = !!f.m4marks[fl.k];
+            var cls = '', res = '';
+            if (f.m4reviewed) {
+              var correct = marked === !fl.need;
+              cls = correct ? ' good' : ' bad';
+              res = '<span class="res">' + (fl.need ? 'Necesario' : 'Sobra') + '</span>';
+            }
+            return '<label class="field' + cls + '"><input type="checkbox" id="fld-' + fl.k + '" data-f="' + fl.k + '"' + (marked ? ' checked' : '') + (f.m4reviewed ? ' disabled' : '') + '><span class="n">' + fl.k + '</span>' + res + '</label>';
+          }).join('') + '</div>' +
+          (f.m4reviewed ? '' : '<button type="button" class="small-btn" id="reviewBtn">Revisar mi respuesta</button>') + '</div>';
+        if (f.m4reviewed) {
+          var hits = FIELDS.filter(function (fl) { return !!f.m4marks[fl.k] === !fl.need; }).length;
+          side += '<p class="fb">Acertaste ' + hits + ' de ' + FIELDS.length + ' campos. Solo <span class="mono">nombre</span> y <span class="mono">estatus</span> son necesarios.</p>';
+          side += successBlock(3);
+        }
+      }
+    } else if (state.done[i]) {
+      side = successBlock(i);
+      if (i === 1 && !state.flags.saw403) side = '<p class="fb">Tip: intenta también con el token del chatbot para ver qué responde la API.</p>' + side;
+    } else {
+      side = '<p class="pending">Aún no hay resultado. Envía la solicitud y observa la respuesta.</p>';
+    }
+    $('mission').innerHTML = main + '<div class="mission-side">' + side + '</div>';
+
+    var nb = $('nextBtn');
+    if (nb) nb.addEventListener('click', function () { state.active = Math.min(i + 1, MISSIONS.length - 1); save(); renderSteps(); renderMission(); });
+    Array.prototype.forEach.call(document.querySelectorAll('.opt'), function (b) {
+      b.addEventListener('click', function () { state.flags.quizPick = Number(b.getAttribute('data-q')); renderSteps(); renderMission(); renderSteps(); });
+    });
+    Array.prototype.forEach.call(document.querySelectorAll('[data-f]'), function (cb) {
+      cb.addEventListener('change', function () { state.flags.m4marks[cb.getAttribute('data-f')] = cb.checked; });
+    });
+    var rb = $('reviewBtn');
+    if (rb) rb.addEventListener('click', function () { state.flags.m4reviewed = true; complete(3); renderSteps(); renderMission(); });
+  }
+
+  /* --- Header controls --- */
+  $('sigmaBtn').addEventListener('click', function () {
+    state.sigmaDown = !state.sigmaDown;
+    $('sigmaBtn').setAttribute('aria-pressed', state.sigmaDown);
+    $('sigmaTxt').textContent = state.sigmaDown ? 'COR Bancario: sin servicio' : 'COR Bancario: en línea';
+  });
+  $('resetBtn').addEventListener('click', function () {
+    initState(); save();
+    $('sigmaBtn').setAttribute('aria-pressed', 'false'); $('sigmaTxt').textContent = 'COR Bancario: en línea';
+    $('idInput').value = EP[state.ep].def;
+    $('badge').className = 'badge idle'; $('badge').textContent = 'Sin enviar';
+    $('latency').textContent = ''; $('meaning').textContent = 'Arma la solicitud y pulsa “Enviar solicitud”.';
+    $('resView').innerHTML = '<span class="empty">La respuesta aparecerá aquí, en formato JSON.</span>';
+    renderLog(); syncBuilder(); renderSteps(); renderMission();
+  });
+  $('sendBtn').addEventListener('click', send);
+
+  buildChoices();
+  $('idInput').value = EP[state.ep].def;
+  syncBuilder(); renderSteps(); renderMission(); renderLog();
+})();
+</script>
+</body>
+</html>
