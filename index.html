@@ -10,21 +10,22 @@
 <style>
 /* Layout: una consola de API de un banco ficticio — misiones arriba, constructor de solicitud a la izquierda, solicitud y respuesta a la derecha, bitácora al pie. */
 :root {
-  --bg: #F4F2EC;
-  --surface: #FFFDF8;
-  --surface-2: #ECE8DF;
-  --line: #D9D3C7;
-  --fg: #14213D;
-  --muted: #4A5568;
-  --accent: #B54A17;
-  --accent-fill: #E0692B;
-  --accent-soft: #FBE7DB;
-  --code-bg: #14213D;
-  --code-fg: #E9E6DF;
-  --code-muted: #9AA6BA;
-  --code-key: #F2A07B;
-  --code-str: #A8D5B9;
-  --code-num: #F2CC7A;
+  --bg: #F1F4F1;
+  --surface: #FBFCFA;
+  --surface-2: #E2EBE5;
+  --line: #C9D7CE;
+  --fg: #12302A;
+  --muted: #4A5E56;
+  --accent: #1D6B50;
+  --accent-fill: #1F5C4A;
+  --on-accent: #FFFFFF;
+  --accent-soft: #DCEBE2;
+  --code-bg: #133B2F;
+  --code-fg: #E8F0EA;
+  --code-muted: #9DB8AA;
+  --code-key: #F2C46B;
+  --code-str: #B9E3C9;
+  --code-num: #F5D38E;
   --ok: #1F6E47;
   --ok-soft: #DDF0E5;
   --warn: #8A5200;
@@ -38,17 +39,17 @@
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
-    --bg: #0E1524; --surface: #162036; --surface-2: #1D2944; --line: #2C3A58;
-    --fg: #ECE9E2; --muted: #A9B3C4; --accent: #F2A07B; --accent-fill: #E0692B; --accent-soft: #3A2A22;
-    --code-bg: #0A101C; --code-fg: #E9E6DF; --code-muted: #8794AA; --code-key: #F2A07B; --code-str: #A8D5B9; --code-num: #F2CC7A;
+    --bg: #0B1813; --surface: #11231C; --surface-2: #172F25; --line: #254236;
+    --fg: #E6EFE9; --muted: #A3B8AD; --accent: #7FCBA7; --accent-fill: #2E7D5F; --on-accent: #FFFFFF; --accent-soft: #19382C;
+    --code-bg: #07120E; --code-fg: #E8F0EA; --code-muted: #8AA698; --code-key: #F2C46B; --code-str: #B9E3C9; --code-num: #F5D38E;
     --ok: #6CCB98; --ok-soft: #173327; --warn: #F2B45A; --warn-soft: #3A2C14; --err: #FF8F84; --err-soft: #3D1C1A;
     color-scheme: dark;
   }
 }
 :root[data-theme="dark"] {
-  --bg: #0E1524; --surface: #162036; --surface-2: #1D2944; --line: #2C3A58;
-  --fg: #ECE9E2; --muted: #A9B3C4; --accent: #F2A07B; --accent-fill: #E0692B; --accent-soft: #3A2A22;
-  --code-bg: #0A101C; --code-fg: #E9E6DF; --code-muted: #8794AA; --code-key: #F2A07B; --code-str: #A8D5B9; --code-num: #F2CC7A;
+  --bg: #0B1813; --surface: #11231C; --surface-2: #172F25; --line: #254236;
+  --fg: #E6EFE9; --muted: #A3B8AD; --accent: #7FCBA7; --accent-fill: #2E7D5F; --on-accent: #FFFFFF; --accent-soft: #19382C;
+  --code-bg: #07120E; --code-fg: #E8F0EA; --code-muted: #8AA698; --code-key: #F2C46B; --code-str: #B9E3C9; --code-num: #F5D38E;
   --ok: #6CCB98; --ok-soft: #173327; --warn: #F2B45A; --warn-soft: #3A2C14; --err: #FF8F84; --err-soft: #3D1C1A;
   color-scheme: dark;
 }
@@ -143,7 +144,7 @@ legend { font-size: 13px; font-weight: 600; color: var(--muted); margin-bottom: 
 .choice .desc { font-size: 14px; font-weight: 600; }
 .choice .sub { font-size: 13px; color: var(--muted); }
 .verb { flex: none; font-family: var(--font-mono); font-size: 11px; font-weight: 500; padding: 2px 6px; border-radius: 4px; margin-top: 2px; color: var(--surface); background: var(--fg); }
-.verb.post { background: var(--accent-fill); color: #14213D; }
+.verb.post { background: var(--accent-fill); color: var(--on-accent); }
 .idrow { display: flex; flex-direction: column; gap: 8px; }
 .idrow label { font-size: 13px; font-weight: 600; color: var(--muted); }
 .idrow input { font-family: var(--font-mono); font-size: 15px; border: 1px solid var(--line); background: var(--bg); border-radius: 8px; padding: 10px 12px; width: 100%; }
@@ -152,7 +153,7 @@ legend { font-size: 13px; font-weight: 600; color: var(--muted); margin-bottom: 
 .seg { display: inline-flex; border: 1px solid var(--line); border-radius: 999px; padding: 3px; background: var(--bg); align-self: flex-start; }
 .seg button { border: none; background: transparent; border-radius: 999px; padding: 6px 14px; font-size: 13px; font-weight: 600; color: var(--muted); }
 .seg button[aria-pressed="true"] { background: var(--fg); color: var(--bg); }
-.send { border: none; background: var(--accent-fill); color: #14213D; font-weight: 600; font-size: 16px; border-radius: 10px; padding: 12px 18px; display: flex; justify-content: center; gap: 8px; }
+.send { border: none; background: var(--accent-fill); color: var(--on-accent); font-weight: 600; font-size: 16px; border-radius: 10px; padding: 12px 18px; display: flex; justify-content: center; gap: 8px; }
 .send:disabled { opacity: .6; cursor: progress; }
 
 .codeblock { background: var(--code-bg); color: var(--code-fg); border-radius: 10px; padding: 16px; font-family: var(--font-mono); font-size: 13.5px; line-height: 1.6; white-space: pre-wrap; overflow-wrap: anywhere; margin: 0; overflow-x: auto; }
