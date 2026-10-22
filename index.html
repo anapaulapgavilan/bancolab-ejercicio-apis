@@ -2,12 +2,13 @@
 <html lang="es">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <title>BancoLab API</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&family=Source+Serif+4:opsz,wght@8..60,500;8..60,600&display=swap">
 <style>
+body { margin: 0; }
 /* Layout: una consola de API de un banco ficticio — misiones arriba, constructor de solicitud a la izquierda, solicitud y respuesta a la derecha, bitácora al pie. */
 :root {
   --bg: #F1F4F1;
@@ -54,7 +55,6 @@
   color-scheme: dark;
 }
 * { box-sizing: border-box; }
-body { margin: 0; }
 body { background: var(--bg); color: var(--fg); font-family: var(--font-body); font-size: 15px; line-height: 1.5; }
 h1, h2, h3 { font-family: var(--font-display); font-weight: 600; text-wrap: balance; margin: 0; }
 p { margin: 0; }
@@ -267,8 +267,8 @@ legend { font-size: 13px; font-weight: 600; color: var(--muted); margin-bottom: 
   @keyframes rise { from { opacity: .3; transform: translateY(4px); } to { opacity: 1; transform: none; } }
 }
 </style>
-</head>
-<body>
+
+
 <header class="top">
   <div class="top-in">
     <div class="brand">
@@ -724,6 +724,8 @@ legend { font-size: 13px; font-weight: 600; color: var(--muted); margin-bottom: 
     });
   }
   var aiSleep = function (ms) { return new Promise(function (r) { setTimeout(r, ms); }); };
+  var AI_ENDPOINT = ''; // URL del servidor intermediario (Cloudflare Worker) para la página pública
+  var aiMode = null; // 'sample' dentro de Claude, 'api' en la página pública
   var aiTurn = null;
   var aiTurns = [], aiBusy = false, aiCtl = null, aiT0 = 0, aiPending = null, aiSample = null, aiReady = false;
   var AI_RULES = [
@@ -944,9 +946,48 @@ legend { font-size: 13px; font-weight: 600; color: var(--muted); margin-bottom: 
     rate_limited: 'Se alcanzó el límite de uso por ahora. Espera un momento y vuelve a intentarlo.',
     tools_unavailable: 'Esta vista de Claude no permite que la IA use herramientas. Prueba en claude.ai desde el navegador o la app de escritorio.',
     session_expired: 'La sesión de Claude expiró. Vuelve a iniciar sesión.',
-    refused: 'Claude no respondió a este mensaje. Prueba con otro.'
+    refused: 'Claude no respondió a este mensaje. Prueba con otro.',
+    empty_completion: 'Claude no generó una respuesta. Prueba con otro mensaje.'
   };
   function aiNotice(html) { $('aiNotice').innerHTML = html; $('aiNotice').hidden = !html; }
+  async function aiRunApi(signal) {
+    var msgs = aiTurns.slice(-11).map(function (t) { return { role: t.role, content: t.content }; });
+    for (var round = 0; round < 6; round++) {
+      var resp;
+      try {
+        resp = await fetch(AI_ENDPOINT, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ messages: msgs }), signal: signal });
+      } catch (e) {
+        if (e && e.name === 'AbortError') throw { code: 'cancelled' };
+        throw { code: 'upstream_error', message: 'No se pudo conectar con el servidor de IA.' };
+      }
+      var data = await resp.json().catch(function () { return {}; });
+      if (!resp.ok) throw { code: resp.status === 429 ? 'rate_limited' : 'upstream_error', message: data.mensaje || 'Error del servidor de IA.' };
+      msgs.push({ role: 'assistant', content: data.content });
+      if (data.stop_reason === 'tool_use') {
+        var results = [];
+        for (var i = 0; i < data.content.length; i++) {
+          var block = data.content[i];
+          if (block.type !== 'tool_use') continue;
+          var tool = AI_TOOLS.filter(function (t) { return t.name === block.name; })[0];
+          try {
+            if (!tool) throw new Error('Herramienta desconocida: ' + block.name);
+            var out = await tool.execute(block.input || {}, { signal: signal });
+            results.push({ type: 'tool_result', tool_use_id: block.id, content: JSON.stringify(out) });
+          } catch (e) {
+            results.push({ type: 'tool_result', tool_use_id: block.id, content: String((e && e.message) || e), is_error: true });
+          }
+        }
+        if (signal.aborted) throw { code: 'cancelled' };
+        msgs.push({ role: 'user', content: results });
+        continue;
+      }
+      var text = (data.content || []).filter(function (b) { return b.type === 'text'; }).map(function (b) { return b.text; }).join('\n').trim();
+      if (!text) throw { code: 'empty_completion' };
+      return text;
+    }
+    throw { code: 'upstream_error', message: 'La conversación necesitó demasiados pasos.' };
+  }
+
   async function aiSend(text) {
     text = String(text || '').trim();
     if (!text || aiBusy) return;
@@ -963,15 +1004,21 @@ legend { font-size: 13px; font-weight: 600; color: var(--muted); margin-bottom: 
     var bubble = null, first = false;
     aiCtl = new AbortController();
     try {
-      var res = await aiSample([{ role: 'user', content: AI_RULES }].concat(aiTurns.slice(-12)), {
-        tools: AI_TOOLS, modelTier: 'quick', signal: aiCtl.signal,
-        onText: function (u) {
-          if (!first) { first = true; aiLight(['nAI', 'nCli'], ['aiL1'], 'Claude redacta la respuesta para Mariana<span class="dots"></span>'); }
-          if (!bubble) bubble = aiMsg('bot', '');
-          bubble.querySelector('.body').textContent = u.text;
-          $('aiChat').scrollTop = $('aiChat').scrollHeight;
-        }
-      });
+      var res;
+      if (aiMode === 'api') {
+        aiLight(['nAI'], [], 'Claude decide qué hacer<span class="dots"></span>');
+        res = { text: await aiRunApi(aiCtl.signal) };
+      } else {
+        res = await aiSample([{ role: 'user', content: AI_RULES }].concat(aiTurns.slice(-12)), {
+          tools: AI_TOOLS, modelTier: 'quick', signal: aiCtl.signal,
+          onText: function (u) {
+            if (!first) { first = true; aiLight(['nAI', 'nCli'], ['aiL1'], 'Claude redacta la respuesta para Mariana<span class="dots"></span>'); }
+            if (!bubble) bubble = aiMsg('bot', '');
+            bubble.querySelector('.body').textContent = u.text;
+            $('aiChat').scrollTop = $('aiChat').scrollHeight;
+          }
+        });
+      }
       if (!bubble) bubble = aiMsg('bot', res.text);
       bubble.querySelector('.body').textContent = res.text;
       aiTurns.push({ role: 'assistant', content: res.text });
@@ -985,7 +1032,7 @@ legend { font-size: 13px; font-weight: 600; color: var(--muted); margin-bottom: 
         aiEv('warn', 'Detenido', '<span>Se detuvo la respuesta.</span>');
         aiLight([], [], 'Se detuvo la respuesta.');
       } else {
-        var msg = (e && AI_ERR[e.code]) || 'Hubo un problema al contactar a Claude. Intenta de nuevo.';
+        var msg = (aiMode === 'api' && e && e.message) || (e && AI_ERR[e.code]) || 'Hubo un problema al contactar a Claude. Intenta de nuevo.';
         if (e && (e.code === 'not_granted' || e.code === 'sampling_disabled' || e.code === 'tools_unavailable')) aiReady = false;
         if (bubble && e && e.text) bubble.querySelector('.body').textContent = e.text;
         aiMsg('sys', msg);
@@ -1019,7 +1066,14 @@ legend { font-size: 13px; font-weight: 600; color: var(--muted); margin-bottom: 
     $('tabAI').addEventListener('click', function () { setTab(true); });
     aiRenderMissions();
     aiReset();
-    if (!window.claude || typeof window.claude.use !== 'function') return; // fuera de Claude: la pestaña de IA queda oculta
+    if (!window.claude || typeof window.claude.use !== 'function') {
+      if (!AI_ENDPOINT) return; // sin servidor configurado: la pestaña de IA queda oculta
+      aiMode = 'api'; aiReady = true;
+      $('tabAI').hidden = false;
+      if (location.hash === '#ia') setTab(true);
+      return;
+    }
+    aiMode = 'sample';
     $('tabAI').hidden = false;
     if (location.hash === '#ia') setTab(true);
     (async function () {
@@ -1056,5 +1110,3 @@ legend { font-size: 13px; font-weight: 600; color: var(--muted); margin-bottom: 
   initAI();
 })();
 </script>
-</body>
-</html>
