@@ -404,6 +404,12 @@ legend { font-size: 13px; font-weight: 600; color: var(--muted); margin-bottom: 
     lectura: { label: 'Token del chatbot', short: 'Chatbot (lectura)', sub: 'Permiso de solo lectura', header: 'Bearer chatbot_lect_••••••', sdk: 'chatbot_lect_••••••', scopes: ['read'] },
     ops: { label: 'Token de agente autorizado', short: 'Agente (operaciones)', sub: 'Permiso de lectura y operaciones', header: 'Bearer agente_ops_••••••', sdk: 'agente_ops_••••••', scopes: ['read', 'write'] }
   };
+  function localStamp() {
+    var d = new Date(), p = function (n) { return String(Math.abs(n)).padStart(2, '0'); };
+    var off = -d.getTimezoneOffset(), sg = off >= 0 ? '+' : '-';
+    return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate()) + 'T' + p(d.getHours()) + ':' + p(d.getMinutes()) + ':' + p(d.getSeconds()) + sg + p(Math.floor(Math.abs(off) / 60)) + ':' + p(Math.abs(off) % 60);
+  }
+  var STATUS_OP_OK = '<b>Solicitud exitosa.</b> La API ejecutó la operación: la tarjeta quedó bloqueada.';
   var STATUS = {
     200: { t: '200 OK', k: 'ok', m: '<b>Solicitud exitosa.</b> La API devolvió la información solicitada.' },
     400: { t: '400 Bad Request', k: 'warn', m: '<b>Solicitud incompleta.</b> Falta un dato obligatorio o tiene un formato incorrecto.' },
@@ -575,7 +581,7 @@ legend { font-size: 13px; font-weight: 600; color: var(--muted); margin-bottom: 
       if (tj.estatus === 'bloqueada') return { s: 409, b: { error: 'conflicto', mensaje: 'La tarjeta ya se encuentra bloqueada.', folio_bloqueo: tj.folio_bloqueo } };
       tj.estatus = 'bloqueada';
       tj.folio_bloqueo = 'BLQ-2026-' + String(40 + Math.floor(Math.random() * 50)).padStart(4, '0');
-      return { s: 200, b: { id_tarjeta: tj.id_tarjeta, terminacion: tj.terminacion, estatus: 'bloqueada', motivo: 'robo o extravío', folio_bloqueo: tj.folio_bloqueo, bloqueada_en: new Date().toISOString().slice(0, 19) } };
+      return { s: 200, b: { id_tarjeta: tj.id_tarjeta, terminacion: tj.terminacion, estatus: 'bloqueada', motivo: 'robo o extravío', folio_bloqueo: tj.folio_bloqueo, bloqueada_en: localStamp() } };
     }
   }
 
@@ -591,7 +597,7 @@ legend { font-size: 13px; font-weight: 600; color: var(--muted); margin-bottom: 
       badge.className = 'badge ' + info.k; badge.textContent = info.t;
       var ms = state.sigmaDown && r.s === 503 ? '3,000 ms (tiempo de espera agotado)' : Math.round(80 + Math.random() * 160) + ' ms';
       $('latency').textContent = 'Tiempo de respuesta: ' + ms;
-      $('meaning').innerHTML = info.m;
+      $('meaning').innerHTML = (r.s === 200 && epKey === 'bloqueo') ? STATUS_OP_OK : info.m;
       var rv = $('resView');
       rv.innerHTML = hl(r.b);
       rv.classList.remove('response-anim'); void rv.offsetWidth; rv.classList.add('response-anim');
