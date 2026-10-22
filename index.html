@@ -724,7 +724,7 @@ legend { font-size: 13px; font-weight: 600; color: var(--muted); margin-bottom: 
     });
   }
   var aiSleep = function (ms) { return new Promise(function (r) { setTimeout(r, ms); }); };
-  var AI_ENDPOINT = ''; // URL del servidor intermediario (Cloudflare Worker) para la página pública
+  var AI_ENDPOINT = 'https://bancolab-ia.anapaulapgavilan.workers.dev/'; // URL del servidor intermediario (Cloudflare Worker) para la página pública
   var aiMode = null; // 'sample' dentro de Claude, 'api' en la página pública
   var aiTurn = null;
   var aiTurns = [], aiBusy = false, aiCtl = null, aiT0 = 0, aiPending = null, aiSample = null, aiReady = false;
